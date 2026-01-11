@@ -18,13 +18,10 @@ with col2:
 
 # ---------- Kunduppgifter ----------
 st.divider()
-c1, c2, c3 = st.columns(3)
-with c1:
-    customer_name = st.text_input("Kundnamn", "Lisa")
-with c2:
-    partner = st.text_input("Samarbete/Partner", "DentFriends")
-with c3:
-    greeting = st.text_input("Avslutning", "Trevlig helg!")
+customer_name = st.text_input("Kundnamn", "")
+partner = "DentFriends"
+greeting = "Trevlig helg!"
+
 
 # ---------- Manuella fält (för din mall) ----------
 st.subheader("Manuella uppgifter (om de inte finns i PDF)")
