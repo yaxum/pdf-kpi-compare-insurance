@@ -18,7 +18,10 @@ with col2:
 
 # ---------- Kunduppgifter ----------
 st.divider()
-customer_name = st.text_input("Kundnamn", "")
+name_col, _ = st.columns([1, 3])
+with name_col:
+    customer_name = st.text_input("Kundnamn", "")
+
 partner = "DentFriends"
 greeting = "Trevlig helg!"
 
@@ -145,8 +148,7 @@ Försäkringsbelopp Rättsskydd
 Tvister och kostnader som ersätts ur Rättsskyddsförsäkringen ökar varje år till antal och till kostnad per ärende.
 Maximal ersättning per skada via {current_company} är {basbelopp_ptl} Basbelopp
 Maximal ersättning per skada via {new_company} är {basbelopp_svedea} Basbelopp
-(1 basbelopp år 2025 är 58 800 kr)
-
+(1 basbelopp år 2026 är 59 200 kr)
 
 Övrigt
 En stor fördel med Svedea är deras skadeavdelning. Det är korta vänt- och ledtider. Personligt bemötande och mycket kunnig personal. Det finns flera specialister på just tand- och protetikskador.
