@@ -80,7 +80,7 @@ auto_location = safe_raw(k_new, "Försäkringsställe")
 location_out = auto_location if auto_location != "—" else location
 
 
-        tab_compare, tab_letter = st.tabs(["📊 Jämförelse", "✉️ Kundtext"])
+tab_compare, tab_letter = st.tabs(["📊 Jämförelse", "✉️ Kundtext"])
 
     # ---------- TAB 1: Jämförelse ----------
     with tab_compare:
