@@ -79,7 +79,7 @@ if st.button("Analysera & skapa kundtext"):
             k_new = extract_kpis(f2.name)
 
     # Auto: Försäkringsställe från NUVARANDE PDF (PTL), fallback till manuellt fält
-    auto_location = safe_raw(k_current, "Försäkringsställe")
+    auto_location = safe_raw(k_new, "Försäkringsställe")
     location_out = auto_location if auto_location != "—" else location
 
 
