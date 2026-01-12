@@ -83,48 +83,48 @@ location_out = auto_location if auto_location != "—" else location
 tab_compare, tab_letter = st.tabs(["📊 Jämförelse", "✉️ Kundtext"])
 
     # ---------- TAB 1: Jämförelse ----------
-    with tab_compare:
-        st.subheader("Utdrag (med källor)")
-        keys = [
-            "Antal tandläkare",
-            "Antal tandhygienister",
-            "Antal tandkirurgi/käkkirurger",
-            "Omsättning",
-            "Avbrottstid",
-            "Protetik (år)",
-            "Premie / Pris",
-        ]
+with tab_compare:
+    st.subheader("Utdrag (med källor)")
+    keys = [
+        "Antal tandläkare",
+        "Antal tandhygienister",
+        "Antal tandkirurgi/käkkirurger",
+        "Omsättning",
+        "Avbrottstid",
+        "Protetik (år)",
+        "Premie / Pris",
+    ]
 
-        for key in keys:
-            c = safe_raw(k_current, key)
-            n = safe_raw(k_new, key)
-            st.markdown(f"### {key}")
-            st.write(f"**{current_company}:** {c}  (sida {safe_page(k_current, key)})")
-            st.write(f"**{new_company}:** {n}  (sida {safe_page(k_new, key)})")
+    for key in keys:
+        c = safe_raw(k_current, key)
+        n = safe_raw(k_new, key)
+        st.markdown(f"### {key}")
+        st.write(f"**{current_company}:** {c}  (sida {safe_page(k_current, key)})")
+        st.write(f"**{new_company}:** {n}  (sida {safe_page(k_new, key)})")
 
     # ---------- TAB 2: Kundtext (din mall) ----------
-    with tab_letter:
-        new_price = safe_raw(k_new, "Premie / Pris")
-        current_price = safe_raw(k_current, "Premie / Pris")
+with tab_letter:
+    new_price = safe_raw(k_new, "Premie / Pris")
+    current_price = safe_raw(k_current, "Premie / Pris")
 
-        # Premiegrund från NY offert
-        oms_new = safe_raw(k_new, "Omsättning")
-        avbrott_new = safe_raw(k_new, "Avbrottstid")
-        dentists_new = safe_raw(k_new, "Antal tandläkare")
-        hygienists_new = safe_raw(k_new, "Antal tandhygienister")
+    # Premiegrund från NY offert
+    oms_new = safe_raw(k_new, "Omsättning")
+    avbrott_new = safe_raw(k_new, "Avbrottstid")
+    dentists_new = safe_raw(k_new, "Antal tandläkare")
+    hygienists_new = safe_raw(k_new, "Antal tandhygienister")
 
-        # Jämförelse
-        oms_current = safe_raw(k_current, "Omsättning")
-        hygienists_current = safe_raw(k_current, "Antal tandhygienister")
+    # Jämförelse
+    oms_current = safe_raw(k_current, "Omsättning")
+    hygienists_current = safe_raw(k_current, "Antal tandhygienister")
 
-        injections_note = ""
-        if include_injections_note:
-            injections_note = (
-                "\nNotera att offerten inte inkluderar estetiska injektionsbehandlingar (botox/filler). "
-                "Återkom om det finns ett behov av att utöka omfattningen till att även omfatta den typen av behandlingar.\n"
-            )
+    injections_note = ""
+    if include_injections_note:
+        injections_note = (
+            "\nNotera att offerten inte inkluderar estetiska injektionsbehandlingar (botox/filler). "
+            "Återkom om det finns ett behov av att utöka omfattningen till att även omfatta den typen av behandlingar.\n"
+        )
 
-        letter = f"""Hej {customer_name},
+    letter = f"""Hej {customer_name},
 
 Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}. 
 
