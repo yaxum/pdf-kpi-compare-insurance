@@ -3,6 +3,7 @@ import pdfplumber
 from dataclasses import dataclass
 from typing import Optional, Dict, List, Tuple
 
+
 # -------------------- Data models --------------------
 
 @dataclass
@@ -17,25 +18,40 @@ class KPI:
     unit: Optional[str]
     evidence: Optional[Evidence]
 
+
 # -------------------- Helpers --------------------
 
 def to_number(s: str) -> float:
-    s = s.replace("\u00A0", " ").replace(" ", "").replace(",", ".")
+    """
+    Klarar "3,00" och "10 000" etc.
+    """
+    s = s.replace("\u00A0", " ").strip()
+    s = s.replace(" ", "").replace(",", ".")
     return float(s)
 
 def read_pages(path: str) -> List[Tuple[int, str]]:
     with pdfplumber.open(path) as pdf:
-        return [(i + 1, p.extract_text() or "") for i, p in enumerate(pdf.pages)]
+        return [(i + 1, (p.extract_text() or "")) for i, p in enumerate(pdf.pages)]
 
-def find_first(pages, patterns, unit=None):
+def first_number_token(line: str) -> Optional[str]:
+    """
+    Plockar första tal-token ur en rad med flera tal.
+    Ex: "10 000 10 000 0 0 0" -> "10 000"
+    """
+    line = line.strip()
+    # första "nummerblock" som kan innehålla mellanrum
+    m = re.match(r"(\d[\d\s]*\d|\d)", line)
+    return m.group(1).strip() if m else None
+
+def find_first(pages, patterns, unit=None) -> KPI:
     for page, text in pages:
         for rx in patterns:
             m = rx.search(text)
             if m:
-                raw = m.group(1)
+                raw = m.group(1).strip()
                 try:
                     val = to_number(raw)
-                except:
+                except Exception:
                     val = None
                 return KPI(
                     value=val,
@@ -45,53 +61,87 @@ def find_first(pages, patterns, unit=None):
                 )
     return KPI(None, None, unit, None)
 
-def find_first_text_line(pages, line_patterns: List[re.Pattern], fallback_address: bool = True) -> KPI:
+def find_first_line(pages, patterns: List[re.Pattern]) -> KPI:
     """
-    För textvärden (t.ex. adress/försäkringsställe).
-    1) Försöker först hitta rader som matchar 'Försäkringsställe(n) ...'
-    2) Om fallback_address=True: försöker hitta en tydlig adressrad av typen 'Stad, Gatan 12'
+    För textvärden där vi vill plocka en rad/bit text.
     """
     for page, text in pages:
+        for rx in patterns:
+            m = rx.search(text)
+            if m:
+                raw = m.group(1).strip()
+                return KPI(
+                    value=None,
+                    raw=raw,
+                    unit=None,
+                    evidence=Evidence(page, m.group(0).strip())
+                )
+    return KPI(None, None, None, None)
+
+def find_company_address_block(pages: List[Tuple[int, str]]) -> KPI:
+    """
+    Försök plocka toppadressblock (bolag + gata + postnr/ort).
+    Fungerar på era format:
+    - Svedea: sida 1 överst: Bolag, Gata, Postnr Ort
+    - PTL: ofta efter "Kundnr:" följt av bolag/adress eller i ett tidigt block.
+    """
+    # Vi tittar främst i första ~3 sidorna (snabbt och brukar räcka)
+    for page, text in pages[:3]:
         lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        if not lines:
+        if len(lines) < 3:
             continue
 
-        # 1) Label-baserade träffar (PTL/Säkra brukar ha detta)
-        for ln in lines:
-            for rx in line_patterns:
-                m = rx.search(ln)
-                if m:
-                    addr_1 = m.group(1).strip()
+        # 1) Direkt toppblock: leta tre på varandra följande rader där tredje har postnr
+        # ex "602 32 Norrköping" eller "952 34 Kalix"
+        for i in range(min(20, len(lines) - 2)):
+            if re.search(r"\b\d{3}\s?\d{2}\b", lines[i + 2]):
+                # Styr upp så att mittenraden ser ut som "gata 12" typ, men vi håller det lätt
+                block = "\n".join([lines[i], lines[i + 1], lines[i + 2]])
+                return KPI(None, block, None, Evidence(page, block))
 
-                    # Ta med postnr/stad om det råkar ligga på nästa rad i vissa PDFs
-                    # (vi kan inte alltid få "nästa rad" här eftersom vi itererar per rad,
-                    #  men ofta står allt på samma rad i era exempel)
-                    return KPI(
-                        value=None,
-                        raw=addr_1,
-                        unit=None,
-                        evidence=Evidence(page, ln)
-                    )
-
-        # 2) Fallback: Svedea-offerten kan ibland ha adress utan label
-        if fallback_address:
-            addr_like = re.compile(
-                r"^[A-ZÅÄÖ][A-Za-zÅÄÖåäö\- ]{2,30},\s*.+\b(gatan|vägen|gränd|torget|allén|allen|stigen|plan|g|v)\b.*$",
-                re.IGNORECASE
-            )
-            for ln in lines:
-                # filtrera bort uppenbara “inte adresser”
-                if len(ln) > 80:
-                    continue
-                if addr_like.search(ln):
-                    return KPI(
-                        value=None,
-                        raw=ln,
-                        unit=None,
-                        evidence=Evidence(page, ln)
-                    )
+        # 2) PTL-variant: block efter "Kundnr:"
+        for i in range(len(lines) - 3):
+            if lines[i].lower().startswith("kundnr"):
+                block = "\n".join([lines[i + 1], lines[i + 2], lines[i + 3]])
+                if re.search(r"\b\d{3}\s?\d{2}\b", lines[i + 3]):
+                    return KPI(None, block, None, Evidence(page, block))
 
     return KPI(None, None, None, None)
+
+def find_svedea_rooms(pages: List[Tuple[int, str]]) -> KPI:
+    """
+    Svedea: "Beh.rum 1-4/kök" (textvärde)
+    """
+    return find_first_line(
+        pages,
+        [
+            re.compile(r"\bBeh\.rum\s+([^\n\r]+)", re.I),
+        ]
+    )
+
+def find_svedea_ksek_turnover(pages: List[Tuple[int, str]]) -> KPI:
+    """
+    Svedea: "Årsomsättning i KSEK" och nästa rad innehåller flera tal.
+    Vi tar första tal-token.
+    """
+    for page, text in pages:
+        m = re.search(r"Årsomsättning\s+i\s*KSEK.*?\n\s*([0-9\s]+)", text, re.I)
+        if m:
+            raw_line = m.group(1).strip()
+            first = first_number_token(raw_line)
+            if first:
+                try:
+                    val = to_number(first)
+                except Exception:
+                    val = None
+                return KPI(
+                    value=val,
+                    raw=first,
+                    unit="KSEK",
+                    evidence=Evidence(page, f"Årsomsättning i KSEK\n{raw_line}")
+                )
+    return KPI(None, None, "KSEK", None)
+
 
 # -------------------- KPI extraction --------------------
 
@@ -99,102 +149,128 @@ def extract_kpis(pdf_path: str) -> Dict[str, KPI]:
     pages = read_pages(pdf_path)
     kpis: Dict[str, KPI] = {}
 
+    # Antal tandläkare (PTL + Svedea)
     kpis["Antal tandläkare"] = find_first(
         pages,
-        [re.compile(r"Antal\s+Tandläkare\s+(\d+)", re.I)],
+        [
+            re.compile(r"Antal\s+Tandläkare\s+(\d+)", re.I),  # PTL
+            re.compile(r"Tandläkare\s*-\s*övrigt\s*([\d\s]+,\d+|\d+)\s*st", re.I),  # Svedea
+        ],
         "st"
     )
 
+    # Antal tandhygienister (PTL)
     kpis["Antal tandhygienister"] = find_first(
         pages,
-        [re.compile(r"Antal\s+Tandhygienister\s+(\d+)", re.I)],
+        [
+            re.compile(r"Antal\s+Tandhygienister\s+(\d+)", re.I),
+        ],
         "st"
     )
 
+    # Antal tandkirurgi/käkkirurger (PTL, ev Svedea om ni får in det senare)
     kpis["Antal tandkirurgi/käkkirurger"] = find_first(
         pages,
         [
             re.compile(r"Antal\s+Käkkirurger\s+(\d+)", re.I),
             re.compile(r"Antal\s+Tandkirurger\s+(\d+)", re.I),
+            re.compile(r"Käkkirurger\s*-\s*övrigt\s*([\d\s]+,\d+|\d+)\s*st", re.I),
+            re.compile(r"Tandkirurger\s*-\s*övrigt\s*([\d\s]+,\d+|\d+)\s*st", re.I),
         ],
         "st"
     )
 
-    kpis["Omsättning"] = find_first(
+    # Omsättning
+    # PTL: "Årsomsättning 8 232 000 kr"
+    oms_ptl = find_first(
         pages,
         [
             re.compile(r"Årsomsättning\s+([\d\s]+)\s*kr", re.I),
-            re.compile(r"Årsomsättning\s+i\s*KSEK.*?([\d\s]+)", re.I | re.S),
         ],
-        "kr / KSEK"
+        "kr"
     )
+    if oms_ptl.raw:
+        kpis["Omsättning"] = oms_ptl
+    else:
+        kpis["Omsättning"] = find_svedea_ksek_turnover(pages)
 
-    # ✅ Avbrottstid: gör specifik, inte "första bästa X månader"
+    # Avbrottstid
     kpis["Avbrottstid"] = find_first(
         pages,
         [
-            # PTL/Säkra-varianten
-            re.compile(r"Avbrottsförsäkring\s+(\d+)\s*månader", re.I),
-            # Svedea-varianten (brukar stå "Ansvarstid 18 månader")
-            re.compile(r"Ansvarstid\s+(\d+)\s*månader", re.I),
+            re.compile(r"Avbrottsförsäkring\s+(\d+)\s*månader", re.I),  # PTL
+            re.compile(r"Ansvarstid\s+(\d+)\s*månader", re.I),          # Svedea
         ],
         "månader"
     )
 
+    # Protetik (år) - PTL "Grund 3 år"
     kpis["Protetik (år)"] = find_first(
         pages,
-        [re.compile(r"Grund\s+(\d+)\s*år", re.I)],
+        [
+            re.compile(r"Grund\s+(\d+)\s*år", re.I),
+        ],
         "år"
     )
 
+    # Premie / Pris
     kpis["Premie / Pris"] = find_first(
         pages,
         [
-            re.compile(r"Total\s+årspremie\s+([\d\s]+)\s*kr", re.I),
-            re.compile(r"Årspremie\s+([\d\s]+)\s*kr", re.I),
+            re.compile(r"Total\s+årspremie\s+([\d\s]+)\s*kr", re.I),  # PTL
+            re.compile(r"Årspremie\s+([\d\s]+)\s*kr", re.I),          # Svedea
         ],
         "kr"
     )
 
-    # ✅ Ny: Försäkringsställe (PTL har label, Svedea kan ibland sakna label)
-    kpis["Försäkringsställe"] = find_first_text_line(
+    # Antal behandlingsrum (rooms) - Svedea
+    kpis["Antal behandlingsrum"] = find_svedea_rooms(pages)
+
+    # Försäkringsställe / Adress (robust)
+    # Prioritet: toppblock > labelrad
+    addr_block = find_company_address_block(pages)
+
+    # PTL har ofta: "Försäkringsställen Hantverkargatan 1 a, 95234"
+    addr_label = find_first_line(
         pages,
-        line_patterns=[
-            re.compile(r"Försäkringsställen?\s+(.+)$", re.I),
-            re.compile(r"Försäkringsställe\s*[:\-]\s*(.+)$", re.I),
-        ],
-        fallback_address=True
+        [
+            re.compile(r"Försäkringsställen?\s+(.+)$", re.I | re.M),
+            re.compile(r"Försäkringsställe\s*[:\-]\s*(.+)$", re.I | re.M),
+        ]
     )
+
+    if addr_block.raw:
+        kpis["Försäkringsställe"] = addr_block
+    else:
+        kpis["Försäkringsställe"] = addr_label
 
     return kpis
 
-# -------------------- Comparison --------------------
+
+# -------------------- CLI compare (optional) --------------------
 
 def fmt(k: KPI) -> str:
     if k.value is None:
-        return "—"
+        return k.raw if k.raw else "—"
     if float(k.value).is_integer():
-        return f"{int(k.value)} {k.unit}"
-    return f"{k.value:.2f} {k.unit}"
+        return f"{int(k.value)} {k.unit}".strip()
+    return f"{k.value:.2f} {k.unit}".strip()
 
 def compare(pdf1, pdf2):
     k1 = extract_kpis(pdf1)
     k2 = extract_kpis(pdf2)
 
-    print("| KPI | PDF 1 | PDF 2 | Skillnad | Källa PDF1 | Källa PDF2 |")
-    print("|-----|-------|-------|----------|------------|------------|")
+    print("| KPI | PDF 1 | PDF 2 | Källa PDF1 | Källa PDF2 |")
+    print("|-----|-------|-------|------------|------------|")
 
-    for key in k1:
-        a, b = k1[key], k2[key]
-        diff = "—"
-        if a.value is not None and b.value is not None:
-            diff = b.value - a.value
+    for key in sorted(set(k1.keys()) | set(k2.keys())):
+        a, b = k1.get(key), k2.get(key)
 
         def src(k):
-            return f"s.{k.evidence.page}: {k.evidence.text[:60]}" if k.evidence else "—"
+            return f"s.{k.evidence.page}: {k.evidence.text[:80]}" if k and k.evidence else "—"
 
         print(
-            f"| {key} | {fmt(a)} | {fmt(b)} | {diff} | {src(a)} | {src(b)} |"
+            f"| {key} | {fmt(a) if a else '—'} | {fmt(b) if b else '—'} | {src(a)} | {src(b)} |"
         )
 
 if __name__ == "__main__":
