@@ -78,9 +78,10 @@ if st.button("Analysera & skapa kundtext"):
             k_current = extract_kpis(f1.name)
             k_new = extract_kpis(f2.name)
 
-    # Auto: Försäkringsställe från PDF (ny offert), fallback till manuellt fält
-    auto_location = safe_raw(k_new, "Försäkringsställe")
+    # Auto: Försäkringsställe från NUVARANDE PDF (PTL), fallback till manuellt fält
+    auto_location = safe_raw(k_current, "Försäkringsställe")
     location_out = auto_location if auto_location != "—" else location
+
 
     tab_compare, tab_letter = st.tabs(["📊 Jämförelse", "✉️ Kundtext"])
 
