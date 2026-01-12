@@ -27,11 +27,18 @@ greeting = "Trevlig helg!"
 
 # ---------- Manuella fält (för din mall) ----------
 st.subheader("Manuella uppgifter (om de inte finns i PDF)")
+
+# Init session_state defaults så vi kan auto-fylla efter analys
+if "rooms" not in st.session_state:
+    st.session_state["rooms"] = "—"
+if "location_fallback" not in st.session_state:
+    st.session_state["location_fallback"] = "—"
+
 m1, m2, m3 = st.columns(3)
 
 with m1:
-    rooms = st.text_input("Antal behandlingsrum", "—")
-    location = st.text_input("Försäkringsställe (fallback)", "—")
+    rooms = st.text_input("Antal behandlingsrum", key="rooms")
+    location = st.text_input("Försäkringsställe (fallback)", key="location_fallback")
 
 with m2:
     protetik_manual = st.text_input("Garantiförsäkring protetik", "—")
@@ -51,14 +58,14 @@ st.divider()
 # ---------- Helpers ----------
 def safe_raw(kpis, key):
     try:
-        v = kpis[key]
+        v = kpis.get(key)
         return v.raw if v and v.raw else "—"
     except Exception:
         return "—"
 
 def safe_page(kpis, key):
     try:
-        v = kpis[key]
+        v = kpis.get(key)
         return str(v.evidence.page) if v and v.evidence else "—"
     except Exception:
         return "—"
@@ -78,10 +85,42 @@ if st.button("Analysera & skapa kundtext"):
             k_current = extract_kpis(f1.name)
             k_new = extract_kpis(f2.name)
 
-    # Auto: Försäkringsställe från NUVARANDE PDF (PTL), fallback till manuellt fält
-    auto_location = safe_raw(k_new, "Försäkringsställe")
-    location_out = auto_location if auto_location != "—" else location
+    # ✅ Auto-fill rooms från NYA offerten om den finns (Svedea: "Beh.rum 1-4/kök")
+    auto_rooms = safe_raw(k_new, "Antal behandlingsrum")
+    if auto_rooms != "—":
+        st.session_state["rooms"] = auto_rooms
 
+    # ✅ Auto: Försäkringsställe från NUVARANDE PDF, fallback till manuellt fält
+    auto_location = safe_raw(k_current, "Försäkringsställe")
+    location_out = auto_location if auto_location != "—" else st.session_state["location_fallback"]
+
+    # Vi vill visa resultat direkt efter autofill => rerun så fälten uppdateras
+    # men bara om vi faktiskt fyllde rooms och användaren inte redan skrivit något annat
+    # (Om du vill alltid uppdatera: ta bort if-satsen)
+    st.rerun()
+
+# Om vi har rerun:en ovan så måste resten ligga i "session" eller styras via annan knapp.
+# En enkel lösning: ha en separat knapp för att generera flikarna när PDF:erna finns.
+if pdf_current and pdf_new:
+    st.info("När du har tryckt 'Analysera & skapa kundtext' fylls fält (t.ex. behandlingsrum) automatiskt. Tryck sedan på 'Visa jämförelse & text'.")
+
+if st.button("Visa jämförelse & text"):
+    if not pdf_current or not pdf_new:
+        st.error("Ladda upp båda PDF:erna först.")
+        st.stop()
+
+    with st.spinner("Läser PDF:er..."):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f1, \
+             tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f2:
+            f1.write(pdf_current.read())
+            f2.write(pdf_new.read())
+
+            k_current = extract_kpis(f1.name)
+            k_new = extract_kpis(f2.name)
+
+    # Auto location igen (i fall man inte körde första knappen)
+    auto_location = safe_raw(k_current, "Försäkringsställe")
+    location_out = auto_location if auto_location != "—" else st.session_state["location_fallback"]
 
     tab_compare, tab_letter = st.tabs(["📊 Jämförelse", "✉️ Kundtext"])
 
@@ -97,6 +136,7 @@ if st.button("Analysera & skapa kundtext"):
             "Protetik (år)",
             "Premie / Pris",
             "Försäkringsställe",
+            "Antal behandlingsrum",
         ]
 
         for key in keys:
@@ -106,7 +146,7 @@ if st.button("Analysera & skapa kundtext"):
             st.write(f"**{current_company}:** {c}  (sida {safe_page(k_current, key)})")
             st.write(f"**{new_company}:** {n}  (sida {safe_page(k_new, key)})")
 
-    # ---------- TAB 2: Kundtext (din mall) ----------
+    # ---------- TAB 2: Kundtext ----------
     with tab_letter:
         new_price = safe_raw(k_new, "Premie / Pris")
         current_price = safe_raw(k_current, "Premie / Pris")
@@ -137,7 +177,7 @@ Bifogar här även villkoren hos {new_company} för patientförsäkring, garanti
 
 {new_company} har använt sig av nedan angiva uppgifter som premiegrund i sin offert.
 Omsättning: {oms_new}
-Antal behandlingsrum: {rooms}
+Antal behandlingsrum: {st.session_state["rooms"]}
 Avbrott: {avbrott_new} månader
 Antal tandläkare: {dentists_new}
 Antal tandhygienist: {hygienists_new}
