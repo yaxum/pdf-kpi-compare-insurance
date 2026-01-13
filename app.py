@@ -5,7 +5,7 @@ from kpi_compare import extract_kpis
 st.set_page_config(page_title="PDF KPI-jämförelse", layout="wide")
 st.title("PDF KPI-jämförelse")
 
-# ---------- Upload + bolag ----------
+# ---------------- Upload + bolag ----------------
 col1, col2 = st.columns(2)
 
 with col1:
@@ -16,7 +16,7 @@ with col2:
     pdf_new = st.file_uploader("Ladda upp PDF – Ny offert", type="pdf")
     new_company = st.selectbox("Nytt bolag", ["Svedea", "PTL"], index=0)
 
-# ---------- Kunduppgifter ----------
+# ---------------- Kunduppgifter ----------------
 st.divider()
 name_col, _ = st.columns([1, 3])
 with name_col:
@@ -25,20 +25,21 @@ with name_col:
 partner = "DentFriends"
 greeting = "Trevlig helg!"
 
-# ---------- Manuella fält (för din mall) ----------
+# ---------------- State-init ----------------
+# Vi använder separata nycklar för "auto"-värden så vi aldrig krockar med widget-keys.
+st.session_state.setdefault("rooms_manual", "—")
+st.session_state.setdefault("rooms_auto", "—")
+st.session_state.setdefault("location_manual", "—")
+st.session_state.setdefault("location_auto", "—")
+
+# ---------------- Manuella fält ----------------
 st.subheader("Manuella uppgifter (om de inte finns i PDF)")
-
-# Init session_state defaults så vi kan auto-fylla efter analys
-if "rooms" not in st.session_state:
-    st.session_state["rooms"] = "—"
-if "location_fallback" not in st.session_state:
-    st.session_state["location_fallback"] = "—"
-
 m1, m2, m3 = st.columns(3)
 
 with m1:
-    rooms = st.text_input("Antal behandlingsrum", key="rooms")
-    location = st.text_input("Försäkringsställe (fallback)", key="location_fallback")
+    # Manual input (egen key)
+    rooms_manual = st.text_input("Antal behandlingsrum (manuellt)", key="rooms_manual")
+    location_manual = st.text_input("Försäkringsställe (manuellt fallback)", key="location_manual")
 
 with m2:
     protetik_manual = st.text_input("Garantiförsäkring protetik", "—")
@@ -55,7 +56,7 @@ include_injections_note = st.checkbox(
 
 st.divider()
 
-# ---------- Helpers ----------
+# ---------------- Helpers ----------------
 def safe_raw(kpis, key):
     try:
         v = kpis.get(key)
@@ -70,8 +71,32 @@ def safe_page(kpis, key):
     except Exception:
         return "—"
 
-# ---------- Run ----------
-if st.button("Analysera & skapa kundtext"):
+def effective_rooms() -> str:
+    """
+    Prioritet:
+    1) Om användaren har skrivit manuellt (inte '—' och inte tomt) -> använd det
+    2) annars använd auto från PDF
+    3) annars '—'
+    """
+    manual = (st.session_state.get("rooms_manual") or "").strip()
+    auto = (st.session_state.get("rooms_auto") or "").strip()
+    if manual and manual != "—":
+        return manual
+    if auto and auto != "—":
+        return auto
+    return "—"
+
+def effective_location() -> str:
+    manual = (st.session_state.get("location_manual") or "").strip()
+    auto = (st.session_state.get("location_auto") or "").strip()
+    if auto and auto != "—":
+        return auto
+    if manual and manual != "—":
+        return manual
+    return "—"
+
+# ---------------- Run ----------------
+if st.button("Analysera & visa jämförelse + kundtext"):
     if not pdf_current or not pdf_new:
         st.error("Ladda upp båda PDF:erna först.")
         st.stop()
@@ -85,43 +110,13 @@ if st.button("Analysera & skapa kundtext"):
             k_current = extract_kpis(f1.name)
             k_new = extract_kpis(f2.name)
 
-    # ✅ Auto-fill rooms från NYA offerten om den finns (Svedea: "Beh.rum 1-4/kök")
-    auto_rooms = safe_raw(k_new, "Antal behandlingsrum")
-    if auto_rooms != "—":
-        st.session_state["rooms"] = auto_rooms
+    # -------- Auto-fyll (men i separata keys som INTE är widget-keys) --------
+    st.session_state["rooms_auto"] = safe_raw(k_new, "Antal behandlingsrum")
 
-    # ✅ Auto: Försäkringsställe från NUVARANDE PDF, fallback till manuellt fält
-    auto_location = safe_raw(k_current, "Försäkringsställe")
-    location_out = auto_location if auto_location != "—" else st.session_state["location_fallback"]
+    # Försäkringsställe från NUVARANDE PDF (enligt ert upplägg)
+    st.session_state["location_auto"] = safe_raw(k_current, "Försäkringsställe")
 
-    # Vi vill visa resultat direkt efter autofill => rerun så fälten uppdateras
-    # men bara om vi faktiskt fyllde rooms och användaren inte redan skrivit något annat
-    # (Om du vill alltid uppdatera: ta bort if-satsen)
-    st.rerun()
-
-# Om vi har rerun:en ovan så måste resten ligga i "session" eller styras via annan knapp.
-# En enkel lösning: ha en separat knapp för att generera flikarna när PDF:erna finns.
-if pdf_current and pdf_new:
-    st.info("När du har tryckt 'Analysera & skapa kundtext' fylls fält (t.ex. behandlingsrum) automatiskt. Tryck sedan på 'Visa jämförelse & text'.")
-
-if st.button("Visa jämförelse & text"):
-    if not pdf_current or not pdf_new:
-        st.error("Ladda upp båda PDF:erna först.")
-        st.stop()
-
-    with st.spinner("Läser PDF:er..."):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f1, \
-             tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as f2:
-            f1.write(pdf_current.read())
-            f2.write(pdf_new.read())
-
-            k_current = extract_kpis(f1.name)
-            k_new = extract_kpis(f2.name)
-
-    # Auto location igen (i fall man inte körde första knappen)
-    auto_location = safe_raw(k_current, "Försäkringsställe")
-    location_out = auto_location if auto_location != "—" else st.session_state["location_fallback"]
-
+    # -------- Render output --------
     tab_compare, tab_letter = st.tabs(["📊 Jämförelse", "✉️ Kundtext"])
 
     # ---------- TAB 1: Jämförelse ----------
@@ -145,6 +140,15 @@ if st.button("Visa jämförelse & text"):
             st.markdown(f"### {key}")
             st.write(f"**{current_company}:** {c}  (sida {safe_page(k_current, key)})")
             st.write(f"**{new_company}:** {n}  (sida {safe_page(k_new, key)})")
+
+        st.divider()
+        st.subheader("Auto vs manuellt (kontroll)")
+        st.write(f"**Rooms (auto):** {st.session_state['rooms_auto']}")
+        st.write(f"**Rooms (manuellt):** {st.session_state['rooms_manual']}")
+        st.write(f"**Rooms (används i texten):** {effective_rooms()}")
+        st.write(f"**Försäkringsställe (auto):** {st.session_state['location_auto']}")
+        st.write(f"**Försäkringsställe (manuellt):** {st.session_state['location_manual']}")
+        st.write(f"**Försäkringsställe (används i texten):** {effective_location()}")
 
     # ---------- TAB 2: Kundtext ----------
     with tab_letter:
@@ -177,13 +181,13 @@ Bifogar här även villkoren hos {new_company} för patientförsäkring, garanti
 
 {new_company} har använt sig av nedan angiva uppgifter som premiegrund i sin offert.
 Omsättning: {oms_new}
-Antal behandlingsrum: {st.session_state["rooms"]}
+Antal behandlingsrum: {effective_rooms()}
 Avbrott: {avbrott_new} månader
 Antal tandläkare: {dentists_new}
 Antal tandhygienist: {hygienists_new}
 Garantiförsäkring protetik: {protetik_manual}
 Sjukavbrott: {sjukavbrott_text}
-Försäkringsställe: {location_out}
+Försäkringsställe: {effective_location()}
 {injections_note}
 Jämförelse mellan {new_company} och {current_company}.
 Angiven omsättning: {new_company} {oms_new}, {current_company} {oms_current}.
