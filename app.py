@@ -154,4 +154,76 @@ if st.button("Analysera & visa jämförelse + kundtext"):
         current_price = safe_display(k_current, "Premie / Pris")
 
         oms_new = safe_display(k_new, "Omsättning")
-        avb
+        avbrott_new = safe_display(k_new, "Avbrottstid")
+        dentists_new = safe_display(k_new, "Antal tandläkare")
+        hygienists_new = safe_display(k_new, "Antal tandhygienister")
+
+        oms_current = safe_display(k_current, "Omsättning")
+        hygienists_current = safe_display(k_current, "Antal tandhygienister")
+
+        sjukavbrott_exists_new = safe_display(k_new, "Sjukavbrott (finns)")
+        sjukavbrott_exists_current = safe_display(k_current, "Sjukavbrott (finns)")
+
+        prot_years_new = safe_display(k_new, "Protetik - garantitid (år)")
+        prot_years_current = safe_display(k_current, "Protetik - garantitid (år)")
+        prot_dent_new = safe_display(k_new, "Protetik - antal tandläkare")
+        prot_dent_current = safe_display(k_current, "Protetik - antal tandläkare")
+
+        injections_note = ""
+        if include_injections_note:
+            injections_note = (
+                "\nNotera att offerten inte inkluderar estetiska injektionsbehandlingar (botox/filler). "
+                "Återkom om det finns ett behov av att utöka omfattningen till att även omfatta den typen av behandlingar.\n"
+            )
+
+        letter = f"""Hej {customer_name},
+
+Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}. 
+
+Årspris {new_company}, inklusive arvode: {new_price} 
+Årspris nuvarande {current_company}: {current_price}
+
+Bifogar här även villkoren hos {new_company} för patientförsäkring, garantiförsäkring för protetik samt informationsblad hur garantiförsäkring fungerar hos {new_company}.
+
+{new_company} har använt sig av nedan angiva uppgifter som premiegrund i sin offert.
+Omsättning: {oms_new}
+Antal behandlingsrum: {effective_rooms()}
+Avbrott: {avbrott_new}
+Antal tandläkare: {dentists_new}
+Antal tandhygienist: {hygienists_new}
+Garantiförsäkring protetik (manuell): {protetik_manual}
+Sjukavbrott (manuell): {sjukavbrott_text}
+Sjukavbrott (detekterat i PDF): {sjukavbrott_exists_new}
+Försäkringsställe: {effective_location()}
+
+Protetik (jämförelse):
+- Garantitid (år): {new_company} {prot_years_new}, {current_company} {prot_years_current}
+- Antal tandläkare som omfattas: {new_company} {prot_dent_new}, {current_company} {prot_dent_current}
+
+{injections_note}
+Jämförelse mellan {new_company} och {current_company}.
+Angiven omsättning: {new_company} {oms_new}, {current_company} {oms_current}.
+Antal tandhygienister: {new_company} {hygienists_new}, {current_company} {hygienists_current}.
+Sjukavbrott (PDF-detektion): {new_company} {sjukavbrott_exists_new}, {current_company} {sjukavbrott_exists_current}.
+
+Försäkringsbelopp Rättsskydd
+Tvister och kostnader som ersätts ur Rättsskyddsförsäkringen ökar varje år till antal och till kostnad per ärende.
+Maximal ersättning per skada via {current_company} är {basbelopp_ptl} Basbelopp
+Maximal ersättning per skada via {new_company} är {basbelopp_svedea} Basbelopp
+(1 basbelopp år 2026 är 59 200 kr)
+
+Övrigt
+En stor fördel med Svedea är deras skadeavdelning. Det är korta vänt- och ledtider. Personligt bemötande och mycket kunnig personal. Det finns flera specialister på just tand- och protetikskador.
+Svedeas skadeavdelning kommer oftast i topp när kunder, försäkringsförmedlare och branschorganisationer får sätta betyg.
+
+Vid eventuell accept av offerten om ni önskar teckna garantiförsäkring för protetik behöver vi namn, efternamn och personnummer på de tandläkare som ska omfattas av protetiken då Svedea skriver in det i försäkringsbrevet.
+
+Om ni accepterar offerten återkommer vi med en fullmakt också. Det är något vi formellt behöver få på plats för att få hjälpa er gentemot försäkringsbolagen framöver.
+
+Ni är välkomna att höra av er om ni har några frågor och vi bokar gärna in ett möte om ni önskar det.
+
+{greeting}
+"""
+
+        st.subheader("Kundtext (redo att kopiera)")
+        st.text_area("", letter, height=720)
