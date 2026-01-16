@@ -140,15 +140,6 @@ if st.button("Analysera & visa jämförelse + kundtext"):
             st.write(f"**{current_company}:** {c}  (sida {safe_page(k_current, key)})")
             st.write(f"**{new_company}:** {n}  (sida {safe_page(k_new, key)})")
 
-        st.divider()
-        st.subheader("Auto vs manuellt (kontroll)")
-        st.write(f"**Rooms (auto):** {st.session_state['rooms_auto']}")
-        st.write(f"**Rooms (manuellt):** {st.session_state['rooms_manual']}")
-        st.write(f"**Rooms (används i texten):** {effective_rooms()}")
-        st.write(f"**Försäkringsställe (auto):** {st.session_state['location_auto']}")
-        st.write(f"**Försäkringsställe (manuellt):** {st.session_state['location_manual']}")
-        st.write(f"**Försäkringsställe (används i texten):** {effective_location()}")
-
     with tab_letter:
         new_price = safe_display(k_new, "Premie / Pris")
         current_price = safe_display(k_current, "Premie / Pris")
