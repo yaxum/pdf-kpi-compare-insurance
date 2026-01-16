@@ -87,19 +87,18 @@ label {
 /* Cards / Section Blocks */
 .stMarkdown, .stSelectbox, .stTextInput, .stTextArea {
   background-color: transparent;
-  border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
-  border-radius: var(--radius);
-  padding: 16px;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   box-shadow: none;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 /* Buttons */
 .stButton > button {
-  background-color: var(--color-primary);
-  color: white !important;
-  border: none;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary-navy) !important;
+  border: 2px solid var(--color-primary);
   border-radius: var(--radius-pill);
   padding: 12px 24px;
   font-weight: 600;
@@ -110,7 +109,8 @@ label {
 }
 
 .stButton > button:hover {
-  background-color: var(--color-primary-hover);
+  background-color: var(--color-primary);
+  color: white !important;
   box-shadow: 0 2px 8px rgba(46, 94, 170, 0.2);
   transform: translateY(-1px);
 }
