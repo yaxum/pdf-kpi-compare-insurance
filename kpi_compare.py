@@ -33,39 +33,44 @@ class KPI:
     multiplier: float = 1.0
     evidence: Optional[Evidence] = None
 
-def display(self) -> str:
-    """
-    Human friendly display med svensk talformatering.
-    - Om value saknas: visa raw + unit
-    - Om unit=KSEK: visa "10 000 KSEK (= 10 000 000 kr)"
-    - Annars: visa "8 232 000 kr" etc.
-    """
+    def display(self) -> str:
+        """
+        Human friendly display med svensk talformatering.
+        - Om raw är text (t.ex. "Ja", "Nej"): visa raw direkt
+        - Om value saknas: visa raw + unit
+        - Om unit=KSEK: visa "10 000 KSEK (= 10 000 000 kr)"
+        - Annars: visa "8 232 000 kr" etc.
+        """
 
-    def fmt_number_sv(x: float) -> str:
-        # Om heltal: 8 232 000
-        if float(x).is_integer():
-            return f"{int(x):,}".replace(",", " ")
-        # Annars: 3,50 (svensk decimal)
-        s = f"{x:,.2f}"          # "1,234.56"
-        s = s.replace(",", " ")  # "1 234.56"
-        s = s.replace(".", ",")  # "1 234,56"
-        return s
+        def fmt_number_sv(x: float) -> str:
+            # Om heltal: 8 232 000
+            if float(x).is_integer():
+                return f"{int(x):,}".replace(",", " ")
+            # Annars: 3,50 (svensk decimal)
+            s = f"{x:,.2f}"          # "1,234.56"
+            s = s.replace(",", " ")  # "1 234.56"
+            s = s.replace(".", ",")  # "1 234,56"
+            return s
 
-    if self.value is None:
-        if self.raw:
-            return f"{self.raw} {self.unit or ''}".strip()
-        return "—"
+        # Om raw är text (t.ex. "Ja"/"Nej") - visa det direkt
+        if self.raw and self.raw in ("Ja", "Nej"):
+            return self.raw
 
-    v = self.value
+        if self.value is None:
+            if self.raw:
+                return f"{self.raw} {self.unit or ''}".strip()
+            return "—"
 
-    # Om originalet var KSEK: visa både raw KSEK och normaliserad SEK (kr)
-    if (self.unit or "").upper() == "KSEK":
-        raw_part = f"{self.raw} KSEK" if self.raw else "KSEK"
-        return f"{raw_part} (= {fmt_number_sv(v)} kr)".strip()
+        v = self.value
 
-    # Default: value + unit
-    u = self.unit or ""
-    return f"{fmt_number_sv(v)} {u}".strip()
+        # Om originalet var KSEK: visa både raw KSEK och normaliserad SEK (kr)
+        if (self.unit or "").upper() == "KSEK":
+            raw_part = f"{self.raw} KSEK" if self.raw else "KSEK"
+            return f"{raw_part} (= {fmt_number_sv(v)} kr)".strip()
+
+        # Default: value + unit
+        u = self.unit or ""
+        return f"{fmt_number_sv(v)} {u}".strip()
 
 
 
@@ -190,25 +195,9 @@ def find_ptl_turnover_sek(pages: List[Tuple[int, str]]) -> KPI:
     )
 
 def find_premium_ptl(pages: List[Tuple[int, str]]) -> KPI:
-    """
-    PTL: prioritera "Total årspremie ..." (ofta i försäkringsbesked-delen).
-    Vi försöker först hitta inom sidor där 'Försäkringsbesked' förekommer,
-    annars global fallback.
-    """
-    rx = re.compile(r"Total\s+årspremie\s+([\d\s]+)\s*kr", re.I)
-
-    # 1) Försök hitta sidor med "Försäkringsbesked"
-    priority_pages: List[Tuple[int, str]] = []
-    for page, text in pages:
-        if re.search(r"Försäkringsbesked", text, re.I):
-            priority_pages.append((page, text))
-    if priority_pages:
-        k = find_first(priority_pages, [rx], unit="kr")
-        if k.raw:
-            return k
-
-    # 2) Fallback: hela dokumentet
-    return find_first(pages, [rx], unit="kr")
+    # PTL: "Subtotal" på sida 1 (faktura-totalen)
+    first_pages = [p for p in pages if p[0] == 1]
+    return find_first(first_pages, [re.compile(r"Subtotal\s+([\d\s]+)\s*(?:kr)?", re.I)], unit="kr")
 
 def find_premium_svedea(pages: List[Tuple[int, str]]) -> KPI:
     # Svedea: "Årspremie 37 240 kr"
@@ -225,6 +214,17 @@ def find_protetik_years_ptl(pages: List[Tuple[int, str]]) -> KPI:
         pages,
         [re.compile(r"\bGrund\s+(\d+)\s*år\b", re.I)],
         unit="år",
+    )
+
+def find_protetik_years_svedea(pages: List[Tuple[int, str]]) -> KPI:
+    # Svedea: Garantiförsäkring för protetik är alltid 5 år
+    # Returnera som KPI med value=5 och raw="5"
+    return KPI(
+        value=5.0,
+        raw="5",
+        unit="år",
+        multiplier=1.0,
+        evidence=Evidence(1, "Svedea garantiförsäkring för protetik: alltid 5 år")
     )
 
 def find_protetik_dentist_count_svedea(pages: List[Tuple[int, str]]) -> KPI:
@@ -269,57 +269,19 @@ def find_protetik_dentist_count_ptl(pages: List[Tuple[int, str]]) -> KPI:
     return kpi_none()
 
 def find_location_ptl(pages: List[Tuple[int, str]]) -> KPI:
-    # PTL: "Försäkringsställen Hantverkargatan 1 a, 95234"
+    # PTL: "Försäkringsställen Hantverkargatan 1 a, 95234" (från Försäkringsbesked)
     return find_first_line(
         pages,
-        [
-            re.compile(r"Försäkringsställen?\s+(.+)$", re.I | re.M),
-            re.compile(r"Försäkringsställe\s*[:\-]\s*(.+)$", re.I | re.M),
-        ]
+        [re.compile(r"Försäkringsställen\s+(.+?)(?:\n|$)", re.I)]
     )
 
 def find_location_svedea(pages: List[Tuple[int, str]]) -> KPI:
-    """
-    Svedea: ofta finns en rad som ser ut som "Norrköping, Drottninggatan 64"
-    i egendomsdelen. Vi försöker hitta den nära rubriken, annars fallback.
-    """
-    # 1) sektionstyrd: hitta block runt 'EGENDOMSFÖRSÄKRING' och 'SJÄLVRISK'
-    for page, text in pages[:3]:
-        if re.search(r"EGENDOMSFÖRSÄKRING", text, re.I) and re.search(r"SJÄLVRISK", text, re.I):
-            # hitta rad med "Ort, Gata" (komma är en bra signal)
-            for ln in [l.strip() for l in text.splitlines() if l.strip()]:
-                if re.search(r"^[A-Za-zÅÄÖåäö\- ]+,\s*.+\d", ln):
-                    return KPI(None, ln, None, 1.0, Evidence(page, ln))
-
-    # 2) fallback: första rad som ser ut som "Ort, Gata ..."
-    for page, text in pages[:3]:
-        for ln in [l.strip() for l in text.splitlines() if l.strip()]:
-            if re.search(r"^[A-Za-zÅÄÖåäö\- ]+,\s*.+\d", ln):
-                return KPI(None, ln, None, 1.0, Evidence(page, ln))
-
-    return kpi_none()
-
-def find_company_address_block(pages: List[Tuple[int, str]]) -> KPI:
-    """
-    SISTA FALLBACK: toppadressblock (bolag + gata + postnr/ort).
-    OBS: kan vara förmedlar-/boxadress i vissa PDF:er.
-    """
-    for page, text in pages[:3]:
-        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-        if len(lines) < 3:
-            continue
-
-        for i in range(min(25, len(lines) - 2)):
-            if re.search(r"\b\d{3}\s?\d{2}\b", lines[i + 2]):
-                block = "\n".join([lines[i], lines[i + 1], lines[i + 2]])
-                return KPI(None, block, None, 1.0, Evidence(page, block))
-
-        for i in range(len(lines) - 3):
-            if lines[i].lower().startswith("kundnr"):
-                block = "\n".join([lines[i + 1], lines[i + 2], lines[i + 3]])
-                if re.search(r"\b\d{3}\s?\d{2}\b", lines[i + 3]):
-                    return KPI(None, block, None, 1.0, Evidence(page, block))
-
+    # Svedea: "Norrköping, Drottninggatan 64" direkt under EGENDOMSFÖRSÄKRING/SJÄLVRISK rubriken
+    for page, text in pages:
+        m = re.search(r"EGENDOMSFÖRSÄKRING\s+SJÄLVRISK\s+([^\n]+,[^\n]+\d)", text, re.I)
+        if m:
+            location = m.group(1).strip()
+            return KPI(None, location, None, 1.0, Evidence(page, location))
     return kpi_none()
 
 def find_sjukavbrott_exists(pages: List[Tuple[int, str]]) -> KPI:
@@ -384,13 +346,9 @@ def extract_kpis(pdf_path: str) -> Dict[str, KPI]:
     # Omsättning (normaliserad)
     if company == "Svedea":
         kpis["Omsättning"] = find_svedea_ksek_turnover(pages)  # value = SEK, raw = KSEK
-        if not kpis["Omsättning"].raw:
-            # fallback om layout avviker
-            kpis["Omsättning"] = find_ptl_turnover_sek(pages)
     else:
-        # PTL först
-        k = find_ptl_turnover_sek(pages)
-        kpis["Omsättning"] = k if k.raw else find_svedea_ksek_turnover(pages)
+        # PTL
+        kpis["Omsättning"] = find_ptl_turnover_sek(pages)
 
     # Avbrottstid
     kpis["Avbrottstid"] = find_first(
@@ -403,8 +361,10 @@ def extract_kpis(pdf_path: str) -> Dict[str, KPI]:
     )
 
     # Protetik - garantitid (år)
-    # PTL: Grund 3 år; Svedea varierar -> lämna tom om ej hittas
-    kpis["Protetik - garantitid (år)"] = find_protetik_years_ptl(pages)
+    if company == "Svedea":
+        kpis["Protetik - garantitid (år)"] = find_protetik_years_svedea(pages)
+    else:
+        kpis["Protetik - garantitid (år)"] = find_protetik_years_ptl(pages)
 
     # Protetik - antal tandläkare
     if company == "Svedea":
@@ -421,20 +381,11 @@ def extract_kpis(pdf_path: str) -> Dict[str, KPI]:
     # Antal behandlingsrum (Svedea)
     kpis["Antal behandlingsrum"] = find_svedea_rooms(pages)
 
-    # Försäkringsställe (bolagsspecifik, label/sektion först)
+    # Försäkringsställe (bolagsspecifik)
     if company == "Svedea":
-        loc = find_location_svedea(pages)
-        if loc.raw:
-            kpis["Försäkringsställe"] = loc
-        else:
-            # fallback: toppblock allra sist
-            kpis["Försäkringsställe"] = find_company_address_block(pages)
+        kpis["Försäkringsställe"] = find_location_svedea(pages)
     else:
-        loc = find_location_ptl(pages)
-        if loc.raw:
-            kpis["Försäkringsställe"] = loc
-        else:
-            kpis["Försäkringsställe"] = find_company_address_block(pages)
+        kpis["Försäkringsställe"] = find_location_ptl(pages)
 
     # Sjukavbrott (finns)
     kpis["Sjukavbrott (finns)"] = find_sjukavbrott_exists(pages)
