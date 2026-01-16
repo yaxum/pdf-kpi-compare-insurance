@@ -313,46 +313,61 @@ def find_sjukavbrott_details(pages: List[Tuple[int, str]]) -> KPI:
     """
     Extraherar detaljerad Sjukavbrott-information:
     - Försäkrad (insured person name)
-    - Fasta kostnader (fixed costs)
+    - Fasta kostnader (fixed costs) - konverterar KSEK till MSEK
     Returnerar som t.ex. "Lisa Taavo 1,9 MSEK"
     """
     for page, text in pages:
         if re.search(r"\b(Sjukavbrott|Sjukavbrottsförsäkring)\b", text, re.I):
             lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
             
-            # Hitta försäkrad (insured person name)
+            # Hitta försäkrad (insured person name) - kan ha "-" prefix
             försäkrad = None
             for ln in lines:
-                if re.search(r"Försäkrad\s*=?\s*(.+)$", ln, re.I):
-                    match = re.search(r"Försäkrad\s*=?\s*(.+)$", ln, re.I)
-                    if match:
-                        försäkrad = match.group(1).strip()
-                        break
+                match = re.search(r"(?:^-\s*)?Försäkrad\s*=?\s*(.+)$", ln, re.I)
+                if match:
+                    försäkrad = match.group(1).strip()
+                    break
             
             # Hitta fasta kostnader (fixed costs)
-            fasta_kostnader = None
+            fasta_kostnader_raw = None
+            fasta_kostnader_display = None
             for ln in lines:
-                if re.search(r"Fasta\s+kostnader\s+([\d\s]+(?:,\d+)?\s*(?:KSEK|MSEK|kr|SEK)?)", ln, re.I):
-                    match = re.search(r"Fasta\s+kostnader\s+([\d\s]+(?:,\d+)?\s*(?:KSEK|MSEK|kr|SEK)?)", ln, re.I)
-                    if match:
-                        fasta_kostnader = match.group(1).strip()
-                        break
+                match = re.search(r"Fasta\s+kostnader\s+([\d\s]+(?:,\d+)?)\s*(KSEK|MSEK|kr|SEK)?", ln, re.I)
+                if match:
+                    num_str = match.group(1).strip()
+                    unit = match.group(2).strip().upper() if match.group(2) else ""
+                    
+                    # Konvertera KSEK till MSEK
+                    if unit == "KSEK":
+                        # "1 900" -> 1900 -> 1.9 MSEK
+                        num = float(num_str.replace(" ", "").replace(",", "."))
+                        msek_value = num / 1000.0
+                        # Formatera med svensk decimal
+                        if msek_value == int(msek_value):
+                            fasta_kostnader_display = f"{int(msek_value)} MSEK"
+                        else:
+                            fasta_kostnader_display = f"{msek_value:.1f}".replace(".", ",") + " MSEK"
+                    else:
+                        fasta_kostnader_display = f"{num_str} {unit}".strip()
+                    
+                    fasta_kostnader_raw = fasta_kostnader_display
+                    break
             
-            # Skapa evidence-rad
+            # Skapa resultat-rad
             parts = []
             if försäkrad:
                 parts.append(försäkrad)
-            if fasta_kostnader:
-                parts.append(fasta_kostnader)
+            if fasta_kostnader_display:
+                parts.append(fasta_kostnader_display)
             
-            evidence_text = " ".join(parts) if parts else "Sjukavbrott"
+            result_text = " ".join(parts) if parts else "Sjukavbrott"
             
             return KPI(
                 value=1.0,
-                raw=evidence_text,
+                raw=result_text,
                 unit=None,
                 multiplier=1.0,
-                evidence=Evidence(page, evidence_text)
+                evidence=Evidence(page, result_text)
             )
     
     return KPI(value=0.0, raw="Nej", unit=None, multiplier=1.0, evidence=None)

@@ -7,6 +7,10 @@ import streamlit as st
 import tempfile
 from kpi_compare import extract_kpis
 
+# Inject custom CSS for premium styling
+with open(".streamlit/theme.css") as f:
+    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+
 st.set_page_config(page_title="PDF KPI-jämförelse", layout="wide")
 st.title("PDF KPI-jämförelse")
 
@@ -169,6 +173,18 @@ if st.button("Analysera & visa jämförelse + kundtext"):
                 "Återkom om det finns ett behov av att utöka omfattningen till att även omfatta den typen av behandlingar.\n"
             )
 
+        # Build sjukavbrott row - prioritize manual if filled, otherwise use extracted
+        sjukavbrott_row = ""
+        if sjukavbrott_text and sjukavbrott_text.strip() != "—":
+            sjukavbrott_row = f"Sjukavbrott: {sjukavbrott_text}\n"
+        elif sjukavbrott_details_new and sjukavbrott_details_new != "Nej":
+            sjukavbrott_row = f"Sjukavbrott: {sjukavbrott_details_new}\n"
+        
+        # Build protetik row - add (manuell) label only if filled
+        protetik_row = ""
+        if protetik_manual and protetik_manual.strip() != "—":
+            protetik_row = f"Garantiförsäkring protetik: {protetik_manual}\n"
+
         letter = f"""Hej {customer_name},
 
 Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}. 
@@ -184,11 +200,7 @@ Antal behandlingsrum: {effective_rooms()}
 Avbrott: {avbrott_new}
 Antal tandläkare: {dentists_new}
 Antal tandhygienist: {hygienists_new}
-Garantiförsäkring protetik (manuell): {protetik_manual}
-Sjukavbrott (manuell): {sjukavbrott_text}
-Sjukavbrott (detekterat i PDF): {sjukavbrott_exists_new}
-Sjukavbrott (detaljer): {sjukavbrott_details_new}
-Försäkringsställe: {effective_location()}
+{protetik_row}{sjukavbrott_row}Försäkringsställe: {effective_location()}
 
 Protetik (jämförelse):
 - Garantitid (år): {new_company} {prot_years_new}, {current_company} {prot_years_current}
@@ -198,8 +210,7 @@ Protetik (jämförelse):
 Jämförelse mellan {new_company} och {current_company}.
 Angiven omsättning: {new_company} {oms_new}, {current_company} {oms_current}.
 Antal tandhygienister: {new_company} {hygienists_new}, {current_company} {hygienists_current}.
-Sjukavbrott (PDF-detektion): {new_company} {sjukavbrott_exists_new}, {current_company} {sjukavbrott_exists_current}.
-Sjukavbrott (detaljer): {new_company} {sjukavbrott_details_new}, {current_company} {sjukavbrott_details_current}.
+Sjukavbrott: {new_company} {sjukavbrott_details_new}, {current_company} {sjukavbrott_details_current}.
 
 Försäkringsbelopp Rättsskydd
 Tvister och kostnader som ersätts ur Rättsskyddsförsäkringen ökar varje år till antal och till kostnad per ärende.
