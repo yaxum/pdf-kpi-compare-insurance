@@ -33,35 +33,40 @@ class KPI:
     multiplier: float = 1.0
     evidence: Optional[Evidence] = None
 
-    def display(self) -> str:
-        """
-        Human friendly display: visar gärna normaliserat värde om det finns.
-        - Om value finns och unit=KSEK => visa även normaliserad SEK
-        - Annars visa raw + unit när value saknas
-        """
-        if self.value is None:
-            if self.raw:
-                return f"{self.raw} {self.unit}".strip()
-            return "—"
+def display(self) -> str:
+    """
+    Human friendly display med svensk talformatering.
+    - Om value saknas: visa raw + unit
+    - Om unit=KSEK: visa "10 000 KSEK (= 10 000 000 kr)"
+    - Annars: visa "8 232 000 kr" etc.
+    """
 
-        # visa som heltal om möjligt
-        v = self.value
-        if float(v).is_integer():
-            v_str = f"{int(v)}"
-        else:
-            v_str = f"{v:.2f}"
+    def fmt_number_sv(x: float) -> str:
+        # Om heltal: 8 232 000
+        if float(x).is_integer():
+            return f"{int(x):,}".replace(",", " ")
+        # Annars: 3,50 (svensk decimal)
+        s = f"{x:,.2f}"          # "1,234.56"
+        s = s.replace(",", " ")  # "1 234.56"
+        s = s.replace(".", ",")  # "1 234,56"
+        return s
 
-        # Om originalet var KSEK: visa både original och SEK
-        if (self.unit or "").upper() == "KSEK":
-            # raw KSEK (om finns)
-            raw_part = f"{self.raw} KSEK" if self.raw else "KSEK"
-            # normaliserat i kr
-            sek_int = int(v) if float(v).is_integer() else v
-            return f"{raw_part} (= {sek_int} kr)".strip()
+    if self.value is None:
+        if self.raw:
+            return f"{self.raw} {self.unit or ''}".strip()
+        return "—"
 
-        # default: value + unit (kr/månader/st/år)
-        u = self.unit or ""
-        return f"{v_str} {u}".strip()
+    v = self.value
+
+    # Om originalet var KSEK: visa både raw KSEK och normaliserad SEK (kr)
+    if (self.unit or "").upper() == "KSEK":
+        raw_part = f"{self.raw} KSEK" if self.raw else "KSEK"
+        return f"{raw_part} (= {fmt_number_sv(v)} kr)".strip()
+
+    # Default: value + unit
+    u = self.unit or ""
+    return f"{fmt_number_sv(v)} {u}".strip()
+
 
 
 # -------------------- Helpers --------------------
@@ -83,9 +88,12 @@ def first_number_token(line: str) -> Optional[str]:
     Plockar första tal-token ur en rad med flera tal.
     Ex: "10 000 10 000 0 0 0" -> "10 000"
     """
-    line = line.strip()
-    m = re.match(r"(\d[\d\s]*\d|\d)", line)
-    return m.group(1).strip() if m else None
+    line = line.replace("\u00A0", " ").strip()
+
+    # Hitta alla siffergrupper som kan ha tusentalsmellanslag och ev decimal (3,00)
+    nums = re.findall(r"\d+(?:\s\d{3})*(?:,\d+)?", line)
+    return nums[0].strip() if nums else None
+
 
 def detect_company(pages: List[Tuple[int, str]]) -> str:
     """
