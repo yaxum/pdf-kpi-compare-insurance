@@ -1,8 +1,10 @@
 /* DentFriends Premium Styling */
 
 :root {
-  --color-primary: #E85B4F;
-  --color-primary-hover: #D64F45;
+  --color-primary: #2E5EAA;
+  --color-primary-hover: #1F3A5F;
+  --color-primary-navy: #1F3A5F;
+  --color-primary-light: #E9F0F8;
   --color-bg: #FFFFFF;
   --color-surface: #FAFAFA;
   --color-text: #111111;
@@ -106,7 +108,7 @@ label {
 
 .stButton > button:hover {
   background-color: var(--color-primary-hover);
-  box-shadow: 0 2px 8px rgba(232, 91, 79, 0.2);
+  box-shadow: 0 2px 8px rgba(46, 94, 170, 0.2);
   transform: translateY(-1px);
 }
 
@@ -133,7 +135,7 @@ label {
 .stSelectbox select:focus,
 .stTextArea textarea:focus {
   border: 2px solid var(--color-primary) !important;
-  box-shadow: 0 0 0 2px rgba(232, 91, 79, 0.1) !important;
+  box-shadow: 0 0 0 2px rgba(46, 94, 170, 0.1) !important;
   outline: none !important;
 }
 
@@ -196,7 +198,7 @@ label {
 }
 
 .stMarkdown table tr:hover {
-  background-color: rgba(232, 91, 79, 0.04);
+  background-color: rgba(46, 94, 170, 0.04);
 }
 
 /* Text area (customer text) */
@@ -227,7 +229,7 @@ label {
 
 .stFileUploader:hover {
   border-color: var(--color-primary);
-  background-color: rgba(232, 91, 79, 0.02);
+  background-color: rgba(46, 94, 170, 0.02);
 }
 
 /* Selectbox label */
@@ -274,7 +276,7 @@ label {
 
 .stAlert-info {
   border-left-color: var(--color-primary);
-  background-color: rgba(232, 91, 79, 0.08);
+  background-color: rgba(46, 94, 170, 0.08);
   color: var(--color-primary);
 }
 
