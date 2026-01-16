@@ -36,7 +36,7 @@ class KPI:
     def display(self) -> str:
         """
         Human friendly display med svensk talformatering.
-        - Om raw är text (t.ex. "Ja", "Nej"): visa raw direkt
+        - Om raw är text (t.ex. "Ja", "Nej", eller innehåller namn/beskrivning): visa raw direkt
         - Om value saknas: visa raw + unit
         - Om unit=KSEK: visa "10 000 KSEK (= 10 000 000 kr)"
         - Annars: visa "8 232 000 kr" etc.
@@ -56,10 +56,15 @@ class KPI:
         if self.raw and self.raw in ("Ja", "Nej"):
             return self.raw
 
+        # Om raw innehåller namn/beskrivning (t.ex. "Lisa Taavo 1 900 KSEK") - visa det direkt
+        if self.raw and any(c.isalpha() for c in self.raw):
+            return self.raw
+
         if self.value is None:
             if self.raw:
                 return f"{self.raw} {self.unit or ''}".strip()
-            return "—"
+            # Return 0 for missing numeric values instead of "—"
+            return "0"
 
         v = self.value
 
@@ -287,12 +292,13 @@ def find_location_svedea(pages: List[Tuple[int, str]]) -> KPI:
 def find_sjukavbrott_exists(pages: List[Tuple[int, str]]) -> KPI:
     """
     Returnerar Ja/Nej som text (raw), och value=1/0.
+    Söker efter "Sjukavbrott" eller "SJUKAVBROTTSFÖRSÄKRING"
     """
     for page, text in pages:
-        if re.search(r"\bSjukavbrott\b", text, re.I):
+        if re.search(r"\b(Sjukavbrott|Sjukavbrottsförsäkring)\b", text, re.I):
             # ta en kort evidensrad om möjligt
             lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-            evidence_line = next((ln for ln in lines if re.search(r"\bSjukavbrott\b", ln, re.I)), "Sjukavbrott (träff)")
+            evidence_line = next((ln for ln in lines if re.search(r"\b(Sjukavbrott|Sjukavbrottsförsäkring)\b", ln, re.I)), "Sjukavbrott (träff)")
             return KPI(
                 value=1.0,
                 raw="Ja",
@@ -300,6 +306,55 @@ def find_sjukavbrott_exists(pages: List[Tuple[int, str]]) -> KPI:
                 multiplier=1.0,
                 evidence=Evidence(page, evidence_line)
             )
+    return KPI(value=0.0, raw="Nej", unit=None, multiplier=1.0, evidence=None)
+
+
+def find_sjukavbrott_details(pages: List[Tuple[int, str]]) -> KPI:
+    """
+    Extraherar detaljerad Sjukavbrott-information:
+    - Försäkrad (insured person name)
+    - Fasta kostnader (fixed costs)
+    Returnerar som t.ex. "Lisa Taavo 1,9 MSEK"
+    """
+    for page, text in pages:
+        if re.search(r"\b(Sjukavbrott|Sjukavbrottsförsäkring)\b", text, re.I):
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            
+            # Hitta försäkrad (insured person name)
+            försäkrad = None
+            for ln in lines:
+                if re.search(r"Försäkrad\s*=?\s*(.+)$", ln, re.I):
+                    match = re.search(r"Försäkrad\s*=?\s*(.+)$", ln, re.I)
+                    if match:
+                        försäkrad = match.group(1).strip()
+                        break
+            
+            # Hitta fasta kostnader (fixed costs)
+            fasta_kostnader = None
+            for ln in lines:
+                if re.search(r"Fasta\s+kostnader\s+([\d\s]+(?:,\d+)?\s*(?:KSEK|MSEK|kr|SEK)?)", ln, re.I):
+                    match = re.search(r"Fasta\s+kostnader\s+([\d\s]+(?:,\d+)?\s*(?:KSEK|MSEK|kr|SEK)?)", ln, re.I)
+                    if match:
+                        fasta_kostnader = match.group(1).strip()
+                        break
+            
+            # Skapa evidence-rad
+            parts = []
+            if försäkrad:
+                parts.append(försäkrad)
+            if fasta_kostnader:
+                parts.append(fasta_kostnader)
+            
+            evidence_text = " ".join(parts) if parts else "Sjukavbrott"
+            
+            return KPI(
+                value=1.0,
+                raw=evidence_text,
+                unit=None,
+                multiplier=1.0,
+                evidence=Evidence(page, evidence_text)
+            )
+    
     return KPI(value=0.0, raw="Nej", unit=None, multiplier=1.0, evidence=None)
 
 
@@ -389,6 +444,9 @@ def extract_kpis(pdf_path: str) -> Dict[str, KPI]:
 
     # Sjukavbrott (finns)
     kpis["Sjukavbrott (finns)"] = find_sjukavbrott_exists(pages)
+
+    # Sjukavbrott (detaljer) - insured person + costs
+    kpis["Sjukavbrott (detaljer)"] = find_sjukavbrott_details(pages)
 
     return kpis
 

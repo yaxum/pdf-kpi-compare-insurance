@@ -154,6 +154,8 @@ if st.button("Analysera & visa jämförelse + kundtext"):
 
         sjukavbrott_exists_new = safe_display(k_new, "Sjukavbrott (finns)")
         sjukavbrott_exists_current = safe_display(k_current, "Sjukavbrott (finns)")
+        sjukavbrott_details_new = safe_display(k_new, "Sjukavbrott (detaljer)")
+        sjukavbrott_details_current = safe_display(k_current, "Sjukavbrott (detaljer)")
 
         prot_years_new = safe_display(k_new, "Protetik - garantitid (år)")
         prot_years_current = safe_display(k_current, "Protetik - garantitid (år)")
@@ -185,6 +187,7 @@ Antal tandhygienist: {hygienists_new}
 Garantiförsäkring protetik (manuell): {protetik_manual}
 Sjukavbrott (manuell): {sjukavbrott_text}
 Sjukavbrott (detekterat i PDF): {sjukavbrott_exists_new}
+Sjukavbrott (detaljer): {sjukavbrott_details_new}
 Försäkringsställe: {effective_location()}
 
 Protetik (jämförelse):
@@ -196,6 +199,7 @@ Jämförelse mellan {new_company} och {current_company}.
 Angiven omsättning: {new_company} {oms_new}, {current_company} {oms_current}.
 Antal tandhygienister: {new_company} {hygienists_new}, {current_company} {hygienists_current}.
 Sjukavbrott (PDF-detektion): {new_company} {sjukavbrott_exists_new}, {current_company} {sjukavbrott_exists_current}.
+Sjukavbrott (detaljer): {new_company} {sjukavbrott_details_new}, {current_company} {sjukavbrott_details_current}.
 
 Försäkringsbelopp Rättsskydd
 Tvister och kostnader som ersätts ur Rättsskyddsförsäkringen ökar varje år till antal och till kostnad per ärende.
