@@ -68,10 +68,9 @@ class KPI:
 
         v = self.value
 
-        # Om originalet var KSEK: visa både raw KSEK och normaliserad SEK (kr)
+        # Om originalet var KSEK: visa bara normaliserad SEK (kr)
         if (self.unit or "").upper() == "KSEK":
-            raw_part = f"{self.raw} KSEK" if self.raw else "KSEK"
-            return f"{raw_part} (= {fmt_number_sv(v)} kr)".strip()
+            return f"{fmt_number_sv(v)} kr".strip()
 
         # Default: value + unit
         u = self.unit or ""
@@ -222,14 +221,31 @@ def find_protetik_years_ptl(pages: List[Tuple[int, str]]) -> KPI:
     )
 
 def find_protetik_years_svedea(pages: List[Tuple[int, str]]) -> KPI:
-    # Svedea: Garantiförsäkring för protetik är alltid 5 år
-    # Returnera som KPI med value=5 och raw="5"
+    # Svedea: Försök att hitta garantitiden för protetik i brevet
+    # Om den framgår ska den matchas någonstans nära "protetik" eller "garantiförsäkring"
+    # Annars är standard 3 år
+    
+    result = find_first(
+        pages,
+        [
+            # Möjliga mönster för explicit garantitid
+            re.compile(r"garantiförsäkring\s+för\s+protetik\s+.*?(\d+)\s*år", re.I | re.DOTALL),
+            re.compile(r"protetik\s+.*?(\d+)\s*år", re.I | re.DOTALL),
+        ],
+        unit="år",
+    )
+    
+    # Om vi hittar ett värde i brevet, använd det
+    if result and result.value is not None and result.value > 0:
+        return result
+    
+    # Annars: standard 3 år för Svedea
     return KPI(
-        value=5.0,
-        raw="5",
+        value=3.0,
+        raw="3",
         unit="år",
         multiplier=1.0,
-        evidence=Evidence(1, "Svedea garantiförsäkring för protetik: alltid 5 år")
+        evidence=Evidence(1, "Svedea garantiförsäkring för protetik: 3 år (standard)")
     )
 
 def find_protetik_dentist_count_svedea(pages: List[Tuple[int, str]]) -> KPI:
