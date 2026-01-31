@@ -32,25 +32,8 @@ with name_col:
 partner = "DentFriends"
 greeting = "Trevlig helg!"
 
-st.session_state.setdefault("rooms_manual", "—")
 st.session_state.setdefault("rooms_auto", "—")
-st.session_state.setdefault("location_manual", "—")
 st.session_state.setdefault("location_auto", "—")
-
-st.subheader("Manuella uppgifter (om de inte finns i PDF)")
-m1, m2, m3 = st.columns(3)
-
-with m1:
-    rooms_manual = st.text_input("Antal behandlingsrum (manuellt)", key="rooms_manual")
-    location_manual = st.text_input("Försäkringsställe (manuellt fallback)", key="location_manual")
-
-with m2:
-    protetik_manual = st.text_input("Garantiförsäkring protetik", "—")
-    sjukavbrott_text = st.text_input("Sjukavbrott", "—")
-
-with m3:
-    basbelopp_ptl = st.text_input("Max ersättning PTL (basbelopp)", "__")
-    basbelopp_svedea = st.text_input("Max ersättning Svedea (basbelopp)", "__")
 
 include_injections_note = st.checkbox(
     "Inkludera notis om estetiska injektioner (botox/filler)",
@@ -84,21 +67,15 @@ def safe_page(kpis, key):
         return "—"
 
 def effective_rooms() -> str:
-    manual = (st.session_state.get("rooms_manual") or "").strip()
     auto = (st.session_state.get("rooms_auto") or "").strip()
-    if manual and manual != "—":
-        return manual
     if auto and auto != "—":
         return auto
     return "—"
 
 def effective_location() -> str:
-    manual = (st.session_state.get("location_manual") or "").strip()
     auto = (st.session_state.get("location_auto") or "").strip()
     if auto and auto != "—":
         return auto
-    if manual and manual != "—":
-        return manual
     return "—"
 
 if st.button("Analysera & visa jämförelse + kundtext"):
@@ -173,17 +150,33 @@ if st.button("Analysera & visa jämförelse + kundtext"):
                 "Återkom om det finns ett behov av att utöka omfattningen till att även omfatta den typen av behandlingar.\n"
             )
 
-        # Build sjukavbrott row - prioritize manual if filled, otherwise use extracted
+        # Build sjukavbrott row - use extracted data from scraper
         sjukavbrott_row = ""
-        if sjukavbrott_text and sjukavbrott_text.strip() != "—":
-            sjukavbrott_row = f"Sjukavbrott: {sjukavbrott_text}\n"
-        elif sjukavbrott_details_new and sjukavbrott_details_new != "Nej":
+        if sjukavbrott_details_new and sjukavbrott_details_new != "Nej":
             sjukavbrott_row = f"Sjukavbrott: {sjukavbrott_details_new}\n"
         
-        # Build protetik row - add (manuell) label only if filled
+        # Build protetik row - use extracted data from scraper
         protetik_row = ""
-        if protetik_manual and protetik_manual.strip() != "—":
-            protetik_row = f"Garantiförsäkring protetik: {protetik_manual}\n"
+
+        # Build comparison rows - only include if values differ
+        prot_comparison = ""
+        if prot_years_new != prot_years_current:
+            prot_comparison += f"- Garantitid (år): {new_company} {prot_years_new}, {current_company} {prot_years_current}\n"
+        if prot_dent_new != prot_dent_current:
+            prot_comparison += f"- Antal tandläkare som omfattas: {new_company} {prot_dent_new}, {current_company} {prot_dent_current}\n"
+
+        # Build main comparison section - only include different values
+        comparison_lines = []
+        if oms_new != oms_current:
+            comparison_lines.append(f"Angiven omsättning: {new_company} {oms_new}, {current_company} {oms_current}.")
+        if hygienists_new != hygienists_current:
+            comparison_lines.append(f"Antal tandhygienister: {new_company} {hygienists_new}, {current_company} {hygienists_current}.")
+        if sjukavbrott_details_new != sjukavbrott_details_current:
+            comparison_lines.append(f"Sjukavbrott: {new_company} {sjukavbrott_details_new}, {current_company} {sjukavbrott_details_current}.")
+        
+        comparison_section = ""
+        if comparison_lines:
+            comparison_section = f"Jämförelse mellan {new_company} och {current_company}.\n" + "\n".join(comparison_lines)
 
         letter = f"""Hej {customer_name},
 
@@ -203,19 +196,13 @@ Antal tandhygienist: {hygienists_new}
 {protetik_row}{sjukavbrott_row}Försäkringsställe: {effective_location()}
 
 Protetik (jämförelse):
-- Garantitid (år): {new_company} {prot_years_new}, {current_company} {prot_years_current}
-- Antal tandläkare som omfattas: {new_company} {prot_dent_new}, {current_company} {prot_dent_current}
-
-{injections_note}
-Jämförelse mellan {new_company} och {current_company}.
-Angiven omsättning: {new_company} {oms_new}, {current_company} {oms_current}.
-Antal tandhygienister: {new_company} {hygienists_new}, {current_company} {hygienists_current}.
-Sjukavbrott: {new_company} {sjukavbrott_details_new}, {current_company} {sjukavbrott_details_current}.
+{prot_comparison if prot_comparison else "Villkoren är identiska mellan bolagen."}{injections_note}
+{comparison_section}
 
 Försäkringsbelopp Rättsskydd
 Tvister och kostnader som ersätts ur Rättsskyddsförsäkringen ökar varje år till antal och till kostnad per ärende.
-Maximal ersättning per skada via {current_company} är {basbelopp_ptl} Basbelopp
-Maximal ersättning per skada via {new_company} är {basbelopp_svedea} Basbelopp
+Maximal ersättning per skada via {current_company} är ett basbelopp
+Maximal ersättning per skada via {new_company} är två basbelopp
 (1 basbelopp år 2026 är 59 200 kr)
 
 Övrigt
