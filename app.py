@@ -180,52 +180,54 @@ if st.button("Analysera & visa jämförelse + kundtext"):
 
         letter = f"""Hej {customer_name},
 
-Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}.
+    Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}.
 
 
-PRISER
-──────────────────
-{new_company} (årspris):     {new_price}
-{current_company} (årspris):     {current_price}
+    PRISER
+    ----------------------------------------
+    | Bolag   | Årspris                      |
+    |---------|------------------------------|
+    | {new_company:<7} | {new_price:<28}|
+    | {current_company:<7} | {current_price:<28}|
 
 
-PREMIEGRUND
-──────────────────
-Omsättning:              {oms_new}
-Behandlingsrum:          {effective_rooms()}
-Avbrott:                 {avbrott_new}
-Tandläkare:              {dentists_new}
-Tandhygienister:         {hygienists_new}
-Försäkringsställe:       {effective_location()}
-{protetik_row}{sjukavbrott_row}
-PROTETIK
-──────────────────
-{prot_comparison if prot_comparison else "Villkoren är identiska mellan bolagen."}
+    PREMIEGRUND
+    ----------------------------------------
+    Omsättning:              {oms_new}
+    Behandlingsrum:          {effective_rooms()}
+    Avbrott:                 {avbrott_new}
+    Tandläkare:              {dentists_new}
+    Tandhygienister:         {hygienists_new}
+    Försäkringsställe:       {effective_location()}
+    {protetik_row}{sjukavbrott_row}
 
-{injections_note}
-ÖVRIGA SKILLNADER
-──────────────────
-{comparison_section if comparison_section else "Övriga villkor är identiska."}{"\n\n" if comparison_section else "\n"}
-FÖRSÄKRINGSBELOPP – RÄTTSSKYDD
-──────────────────
-Max ersättning per skada via {current_company}: 1 basbelopp
-Max ersättning per skada via {new_company}: 2 basbelopp
-(1 basbelopp 2026 = 59 200 kr)
+    PROTETIK
+    ----------------------------------------
+    {prot_comparison if prot_comparison else "Villkoren är identiska mellan bolagen."}
 
+    {injections_note}
 
-VID ACCEPT
-──────────────────
-Bifogar här även villkoren hos {new_company} för patientförsäkring, garantiförsäkring för protetik samt informationsblad.
+    ÖVRIGA SKILLNADER
+    ----------------------------------------
+    {comparison_section if comparison_section else "Övriga villkor är identiska."}
 
-Om ni accepterar behöver vi namn, efternamn och personnummer på de tandläkare som ska omfattas av garantiförsäkringen för protetik.
-
-Vi skickar även en fullmakt som behöver undertecknas.
+    FÖRSÄKRINGSBELOPP – RÄTTSSKYDD
+    ----------------------------------------
+    Max ersättning per skada via {current_company}: 1 basbelopp
+    Max ersättning per skada via {new_company}: 2 basbelopp
+    (1 basbelopp 2026 = 59 200 kr)
 
 
-Ni är välkomna att höra av er med frågor eller om ni önskar ett möte för att diskutera offerten.
+    VID ACCEPT
+    ----------------------------------------
+    Bifogar här även villkoren hos {new_company} för patientförsäkring, garantiförsäkring för protetik samt informationsblad.
 
-{greeting}
-"""
+    Vid accept behöver vi namn, efternamn och personnummer på de tandläkare som ska omfattas av garantiförsäkringen för protetik. Vi skickar även en fullmakt som behöver undertecknas.
+
+    Ni är välkomna att höra av er med frågor eller om ni önskar ett möte för att diskutera offerten.
+
+    {greeting}
+    """
 
         st.subheader("Kundtext (redo att kopiera)")
         st.text_area("", letter, height=720)
