@@ -180,40 +180,49 @@ if st.button("Analysera & visa jämförelse + kundtext"):
 
         letter = f"""Hej {customer_name},
 
-Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}. 
+Enligt önskemål bifogas här en offert från {new_company} i samarbete med {partner}.
 
-Årspris {new_company}, inklusive arvode: {new_price} 
-Årspris nuvarande {current_company}: {current_price}
 
-Bifogar här även villkoren hos {new_company} för patientförsäkring, garantiförsäkring för protetik samt informationsblad hur garantiförsäkring fungerar hos {new_company}.
+PRISER
+──────────────────
+{new_company} (årspris):     {new_price}
+{current_company} (årspris):     {current_price}
 
-{new_company} har använt sig av nedan angiva uppgifter som premiegrund i sin offert.
-Omsättning: {oms_new}
-Antal behandlingsrum: {effective_rooms()}
-Avbrott: {avbrott_new}
-Antal tandläkare: {dentists_new}
-Antal tandhygienist: {hygienists_new}
-{protetik_row}{sjukavbrott_row}Försäkringsställe: {effective_location()}
 
-Protetik (jämförelse):
-{prot_comparison if prot_comparison else "Villkoren är identiska mellan bolagen."}{injections_note}
-{comparison_section}
+PREMIEGRUND
+──────────────────
+Omsättning:              {oms_new}
+Behandlingsrum:          {effective_rooms()}
+Avbrott:                 {avbrott_new}
+Tandläkare:              {dentists_new}
+Tandhygienister:         {hygienists_new}
+Försäkringsställe:       {effective_location()}
+{protetik_row}{sjukavbrott_row}
+PROTETIK
+──────────────────
+{prot_comparison if prot_comparison else "Villkoren är identiska mellan bolagen."}
 
-Försäkringsbelopp Rättsskydd
-Tvister och kostnader som ersätts ur Rättsskyddsförsäkringen ökar varje år till antal och till kostnad per ärende.
-Maximal ersättning per skada via {current_company} är ett basbelopp
-Maximal ersättning per skada via {new_company} är två basbelopp
-(1 basbelopp år 2026 är 59 200 kr)
+{injections_note}
+ÖVRIGA SKILLNADER
+──────────────────
+{comparison_section if comparison_section else "Övriga villkor är identiska."}{"\n\n" if comparison_section else "\n"}
+FÖRSÄKRINGSBELOPP – RÄTTSSKYDD
+──────────────────
+Max ersättning per skada via {current_company}: 1 basbelopp
+Max ersättning per skada via {new_company}: 2 basbelopp
+(1 basbelopp 2026 = 59 200 kr)
 
-Övrigt
-En stor fördel med Svedea är deras skadeavdelning. Det är korta vänt- och ledtider. Personligt bemötande och mycket kunnig personal. Det finns flera specialister på just tand- och protetikskador.
-Svedeas skadeavdelning kommer oftast i topp när kunder, försäkringsförmedlare och branschorganisationer får sätta betyg.
 
-Vid eventuell accept av offerten om ni önskar teckna garantiförsäkring för protetik behöver vi namn, efternamn och personnummer på de tandläkare som ska omfattas av protetiken då Svedea skriver in det i försäkringsbrevet.
+VID ACCEPT
+──────────────────
+Bifogar här även villkoren hos {new_company} för patientförsäkring, garantiförsäkring för protetik samt informationsblad.
 
-Om ni accepterar offerten återkommer vi med en fullmakt också. Det är något vi formellt behöver få på plats för att få hjälpa er gentemot försäkringsbolagen framöver.
+Om ni accepterar behöver vi namn, efternamn och personnummer på de tandläkare som ska omfattas av garantiförsäkringen för protetik.
 
-Ni är välkomna att höra av er om ni har några frågor och vi bokar gärna in ett möte om ni önskar det.
+Vi skickar även en fullmakt som behöver undertecknas.
+
+
+Ni är välkomna att höra av er med frågor eller om ni önskar ett möte för att diskutera offerten.
 
 {greeting}
 """
